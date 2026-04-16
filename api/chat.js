@@ -4,7 +4,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { message } = req.body || {};
+    const { message, memory } = req.body || {};
 
     if (!message) {
       return res.status(400).json({ error: "Message is required" });
@@ -87,7 +87,7 @@ MESSAGE GENERATION RULES:
 
 When suggesting texts:
 
-- Avoid obvious intent (do not sound like “I want you” directly)
+- Avoid obvious intent
 - Avoid common dating patterns or overused lines
 - Keep messages short, natural, and slightly imperfect
 - Prefer one strong message over multiple average ones
@@ -95,7 +95,7 @@ When suggesting texts:
 GOOD MESSAGES SHOULD:
 - reference something specific
 - include curiosity or uncertainty
-- invite a meaningful reply (not yes/no)
+- invite a meaningful reply, not just yes/no
 - feel like a spontaneous thought, not a strategy
 
 When suggesting messages, prioritize responses that naturally invite the other person to reply with more than just a short answer.
@@ -103,7 +103,7 @@ When suggesting messages, prioritize responses that naturally invite the other p
 Prefer open-ended, curiosity-based phrasing that feels effortless and conversational, not performative or overly clever.
 
 Good messages should:
-- reference something specific (real or implied context)
+- reference something specific, real or implied context
 - include light curiosity or uncertainty
 - invite explanation, not just reaction
 - feel like a thought, not a strategy
@@ -116,7 +116,7 @@ If the user provides a conversation:
 
 - Analyze tone, reciprocity, emotional dynamic, and level of interest
 - Do not generate a reply blindly; adapt to the existing vibe
-- Match the style of the conversation (casual, playful, cold, etc.)
+- Match the style of the conversation: casual, playful, cold, etc.
 - Improve the user's response without changing their personality too much
 
 --------------------------------------------------
@@ -142,26 +142,41 @@ Rules:
 
 --------------------------------------------------
 
-OUTPUT FORMAT (WHEN RELEVANT):
+OUTPUT FORMAT WHEN RELEVANT:
 
 If analysis is needed, respond with:
 
-- Interest Score (0–92%)
+- Interest Score (0-92%)
 - Trend (rising / stable / fading / unstable)
 - Category (Potential / Mixed / Low / None)
-- Short explanation (natural tone)
+- Short explanation in a natural tone
 - Best next move
-- Suggested message (only one, refined and natural)
+- Suggested message, only one, refined and natural
 
 --------------------------------------------------
 
 TONE SELECTION:
 
-Do NOT immediately generate responses in a fixed tone.
+Do not ask about tone by default.
 
-If the user asks for help with messaging or a situation, first ask a short, natural follow-up question to understand the desired tone or vibe (for example: more playful, more subtle, more direct, more detached).
+If the user's desired vibe is already clear from their message, respond directly in that tone.
 
-Then adapt your response accordingly.
+If the tone is unclear, still give a useful first response, then optionally ask one short follow-up question to refine the tone.
+
+Never get stuck asking for tone repeatedly.
+Never delay useful advice just to clarify style.
+Provide value within the first reply.
+
+RESPONSE FLOW RULE:
+
+In most cases:
+- first reply = useful analysis + best next move
+- second reply if needed = refined message in the chosen or inferred tone
+
+Do not spend multiple turns gathering preferences unless the user explicitly wants that.
+
+If the user asks what to say, always give at least one concrete message suggestion in the first or second response.
+Do not only analyze.
 
 --------------------------------------------------
 
@@ -179,7 +194,7 @@ Always match emotional intensity to the situation.
 
 LANGUAGE:
 
-Always match the user's language (Romanian or English)
+Always match the user's language, Romanian or English.
 
 --------------------------------------------------
 
@@ -204,6 +219,15 @@ Your goal is to:
 Every response should feel real, human, and naturally attractive.
 `;
 
+    const memoryContext = memory?.preferredTone
+      ? `
+
+PRIVATE USER CONTEXT:
+The user's preferred response tone is: ${memory.preferredTone}.
+Use this tone naturally without explicitly mentioning that you remember it unless the user directly asks.
+`
+      : "";
+
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -215,7 +239,7 @@ Every response should feel real, human, and naturally attractive.
         messages: [
           {
             role: "system",
-            content: systemPrompt,
+            content: `${systemPrompt}${memoryContext}`,
           },
           {
             role: "user",
@@ -243,7 +267,7 @@ Every response should feel real, human, and naturally attractive.
       reply = content;
     } else if (Array.isArray(content)) {
       reply = content
-        .filter((part) => part?.type === "text" && typeof part?.text === "string")
+        .filter((part) => typeof part?.text === "string")
         .map((part) => part.text)
         .join("\n");
     }
