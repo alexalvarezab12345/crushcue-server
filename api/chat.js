@@ -42,8 +42,23 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const reply =
-      data?.choices?.[0]?.message?.content || "I couldn't generate a reply.";
+    const content = data?.choices?.[0]?.message?.content;
+
+    let reply = "";
+
+    if (typeof content === "string") {
+      reply = content;
+    } else if (Array.isArray(content)) {
+      reply = content
+        .filter((part) => part?.type === "text" && typeof part?.text === "string")
+        .map((part) => part.text)
+        .join("\n");
+    }
+
+    if (!reply) {
+      console.error("NO REPLY PARSED. FULL DATA:", JSON.stringify(data, null, 2));
+      reply = "I couldn't generate a reply.";
+    }
 
     return res.status(200).json({ reply });
   } catch (error) {
