@@ -97,7 +97,7 @@ EMOTIONAL CALIBRATION:
 
 LANGUAGE:
 
-Match user's language.
+Match user's language always.
 
 --------------------------------------------------
 
@@ -114,6 +114,8 @@ Your goal is to read the situation correctly and respond like a real human.
 
 --------------------------------------------------
 
+When you suggest a ready-to-send message, always place the exact sendable text inside quotation marks.
+Only put the actual message to send inside quotation marks.
 PRIVATE USER CONTEXT (INVISIBLE):
 
 Preferred tone: ${preferredTone}
