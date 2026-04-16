@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -18,7 +18,7 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: [
+        messages: [
           {
             role: "system",
             content:
@@ -42,9 +42,10 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({
-      reply: data.output_text || "I couldn't generate a reply.",
-    });
+    const reply =
+      data?.choices?.[0]?.message?.content || "I couldn't generate a reply.";
+
+    return res.status(200).json({ reply });
   } catch (error) {
     console.error("SERVER ERROR:", error);
     return res.status(500).json({
