@@ -1,3 +1,126 @@
+function normalizeText(text = "") {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function detectLiveMomentType(message = "") {
+  const text = normalizeText(message);
+
+  const sentPatterns = [
+    "i sent it",
+    "sent it",
+    "i sent the message",
+    "i did it",
+    "sent",
+    "done",
+    "just sent it",
+    "ok sent",
+    "okay sent",
+    "gata",
+    "i am trimis",
+    "i am dat",
+    "tocmai am trimis",
+    "am trimis",
+    "gata i am dat",
+    "gata i am trimis",
+  ];
+
+  const repliedPatterns = [
+    "he replied",
+    "she replied",
+    "they replied",
+    "he answered",
+    "she answered",
+    "they answered",
+    "he responded",
+    "she responded",
+    "they responded",
+    "got a reply",
+    "they texted back",
+    "he texted back",
+    "she texted back",
+    "mi a raspuns",
+    "a raspuns",
+    "mi a scris",
+    "mi a dat mesaj",
+    "mi a rasp",
+  ];
+
+  const seenPatterns = [
+    "left me on seen",
+    "left on seen",
+    "seen me",
+    "read it and said nothing",
+    "saw it and said nothing",
+    "no reply",
+    "no response",
+    "ignored me",
+    "she ignored me",
+    "he ignored me",
+    "mi a dat seen",
+    "mi a lasat seen",
+    "nu mi a raspuns",
+    "nu a raspuns",
+    "m a ignorat",
+  ];
+
+  const actionNowPatterns = [
+    "i m about to send it",
+    "im about to send it",
+    "about to send it",
+    "i ll send it now",
+    "ill send it now",
+    "sending it now",
+    "gonna send it now",
+    "i am sending it now",
+    "send it now",
+    "trimit acum",
+    "ii scriu acum",
+    "i scriu acum",
+    "ii dau acum",
+    "ii trimit acum",
+    "ii dau mesaj acum",
+  ];
+
+  if (sentPatterns.some((pattern) => text.includes(pattern))) {
+    return "sent";
+  }
+
+  if (repliedPatterns.some((pattern) => text.includes(pattern))) {
+    return "replied";
+  }
+
+  if (seenPatterns.some((pattern) => text.includes(pattern))) {
+    return "seen";
+  }
+
+  if (actionNowPatterns.some((pattern) => text.includes(pattern))) {
+    return "action_now";
+  }
+
+  return null;
+}
+
+function buildLiveMomentSystemHint(type) {
+  switch (type) {
+    case "action_now":
+      return `The user's latest message indicates they are about to take action right now. Reply in ONE short sentence only. Sound like a real friend: lightly excited, curious, or invested. Do not give more advice.`;
+    case "sent":
+      return `The user's latest message indicates they already sent it. Reply in ONE short sentence only. Sound invested and natural. Do not give more advice.`;
+    case "replied":
+      return `The user's latest message indicates the other person replied. Reply in ONE short sentence only. React first and ask what they said. Do not assume the reply's tone.`;
+    case "seen":
+      return `The user's latest message indicates they were left on seen or got no reply. Reply in ONE short sentence only. Sound calm, empathetic, and controlled. Do not suggest double texting.`;
+    default:
+      return "";
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -23,6 +146,10 @@ module.exports = async function handler(req, res) {
     if (!message || typeof message !== "string" || !message.trim()) {
       return res.status(400).json({ error: "Message is required" });
     }
+
+    const trimmedMessage = message.trim();
+    const liveMomentType = detectLiveMomentType(trimmedMessage);
+    const liveMomentSystemHint = buildLiveMomentSystemHint(liveMomentType);
 
     const preferredTone = memory?.preferredTone || "Classy";
     const currentSituation = memory?.currentSituation || "";
@@ -485,10 +612,18 @@ ${conversationSummary.trim()}
         role: "system",
         content: `${systemPrompt}${summaryContext}`,
       },
+      ...(liveMomentSystemHint
+        ? [
+            {
+              role: "system",
+              content: liveMomentSystemHint,
+            },
+          ]
+        : []),
       ...safeHistory,
       {
         role: "user",
-        content: message.trim(),
+        content: trimmedMessage,
       },
     ];
 
