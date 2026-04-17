@@ -17,16 +17,32 @@ module.exports = async function handler(req, res) {
       memory,
       conversationHistory,
       conversationSummary,
+      last_active_at,
     } = req.body || {};
 
-    if (!message) {
+    if (!message || typeof message !== "string" || !message.trim()) {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const preferredTone = memory?.preferredTone || "classy";
+    const preferredTone = memory?.preferredTone || "Classy";
     const currentSituation = memory?.currentSituation || "";
     const crushType = memory?.crushType || "";
     const userStyle = memory?.userStyle || "";
+
+    let isReturningUser = false;
+    let minutesSinceLastActive = null;
+
+    if (last_active_at) {
+      const lastActiveDate = new Date(last_active_at);
+      if (!Number.isNaN(lastActiveDate.getTime())) {
+        const now = new Date();
+        minutesSinceLastActive = Math.floor((now - lastActiveDate) / (1000 * 60));
+
+        if (minutesSinceLastActive >= 30) {
+          isReturningUser = true;
+        }
+      }
+    }
 
     const systemPrompt = `
 You are CrushCue, an emotionally intelligent crush coach with a refined, modern, socially sharp energy.
@@ -105,6 +121,9 @@ If preferredTone = Flirty:
 - charming
 - slightly more daring
 - still tasteful, never try-hard
+- prioritize fun over cleverness
+- leave space for conversation
+- avoid pushing outcomes too fast
 
 If preferredTone = Direct:
 - clear
@@ -256,6 +275,23 @@ Do not over-dramatize.
 Do not sound cold either.
 
 --------------------------------------------------
+RETURNING USER BEHAVIOR
+
+If the user is returning after a break:
+- acknowledge the continuation naturally only if it fits
+- sound like you remember the emotional thread
+- do not greet like a customer support bot
+- do not overdo it
+- do not explicitly mention timestamps or say "welcome back"
+
+Examples of natural energy:
+- "Okay... what changed?"
+- "Back on this again?"
+- "Tell me what happened."
+
+Only use this kind of energy if it feels natural for the user's message.
+
+--------------------------------------------------
 BOUNDARIES
 
 Never encourage:
@@ -278,6 +314,8 @@ Preferred tone: ${preferredTone}
 Current situation: ${currentSituation}
 Crush type: ${crushType}
 User style: ${userStyle}
+User is returning after a break: ${isReturningUser ? "yes" : "no"}
+Minutes since last activity: ${minutesSinceLastActive ?? "unknown"}
 
 Use this naturally.
 Never mention it explicitly.
@@ -357,7 +395,7 @@ ${conversationSummary.trim()}
       ...safeHistory,
       {
         role: "user",
-        content: message,
+        content: message.trim(),
       },
     ];
 
@@ -387,19 +425,20 @@ ${conversationSummary.trim()}
     const rawContent = data?.choices?.[0]?.message?.content;
 
     let reply = "";
-    let updatedSummary = typeof conversationSummary === "string" ? conversationSummary : "";
+    let updatedSummary =
+      typeof conversationSummary === "string" ? conversationSummary : "";
 
     try {
-      const parsed =
-        typeof rawContent === "string"
-          ? JSON.parse(rawContent)
-          : {};
+      const parsed = typeof rawContent === "string" ? JSON.parse(rawContent) : {};
 
-      if (typeof parsed.reply === "string") {
+      if (typeof parsed.reply === "string" && parsed.reply.trim()) {
         reply = parsed.reply.trim();
       }
 
-      if (typeof parsed.updatedSummary === "string") {
+      if (
+        typeof parsed.updatedSummary === "string" &&
+        parsed.updatedSummary.trim()
+      ) {
         updatedSummary = parsed.updatedSummary.trim();
       }
     } catch (parseError) {
