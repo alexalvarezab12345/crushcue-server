@@ -3,45 +3,132 @@ function normalizeText(text = "") {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function detectReplyLanguage(message = "") {
-  const text = normalizeText(message);
+function detectReplyLanguage(message = "", conversationHistory = []) {
+  const raw = String(message || "");
+  const text = normalizeText(raw);
 
-  const romanianSignals = [
-    "mi",
-    "raspuns",
-    "trimis",
-    "scriu",
-    "trimit",
-    "acum",
-    "gata",
-    "nu",
-    "dat",
-    "mesaj",
-    "ce",
-    "ii",
-    "mai",
-    "scrie",
-    "astept",
-    "las",
-  ];
-
-  const hasRomanianDiacritics = /[ăâîșşțţ]/i.test(message);
-  if (hasRomanianDiacritics) {
+  if (/[ăâîșşțţ]/i.test(raw)) {
     return "ro";
   }
 
-  const words = text.split(" ");
-  const score = romanianSignals.reduce(
-    (acc, word) => acc + (words.includes(word) ? 1 : 0),
-    0
-  );
+  const romanianWords = [
+    "si",
+    "sau",
+    "dar",
+    "ca",
+    "sa",
+    "mai",
+    "acum",
+    "gata",
+    "bine",
+    "ce",
+    "cum",
+    "deci",
+    "azi",
+    "maine",
+    "ieri",
+    "ras",
+    "zis",
+    "spus",
+    "iesim",
+    "atunci",
+    "scriu",
+    "trimit",
+    "trimis",
+    "raspuns",
+    "mesaj",
+    "vrei",
+    "vreau",
+    "mi",
+    "ti",
+    "i",
+    "ii",
+    "nu",
+    "da",
+    "inca",
+    "tot",
+    "las",
+    "astept",
+    "vedem",
+    "maine",
+    "poate",
+  ];
 
-  return score >= 2 ? "ro" : "en";
+  const englishWords = [
+    "the",
+    "and",
+    "but",
+    "what",
+    "now",
+    "later",
+    "reply",
+    "replied",
+    "sent",
+    "message",
+    "should",
+    "text",
+    "wait",
+    "okay",
+    "fine",
+    "good",
+    "he",
+    "she",
+    "they",
+    "said",
+    "asked",
+    "tomorrow",
+    "today",
+    "still",
+    "nothing",
+    "what do i do",
+  ];
+
+  const words = text.split(" ").filter(Boolean);
+
+  let roScore = 0;
+  let enScore = 0;
+
+  for (const word of words) {
+    if (romanianWords.includes(word)) roScore += 1;
+    if (englishWords.includes(word)) enScore += 1;
+  }
+
+  if (/\b(i-am|mi-a|ti-a|m-a|s-a|i a|mi a|ti a|m a|s a)\b/i.test(raw)) {
+    roScore += 3;
+  }
+
+  if (/\b(he|she|they|what|should|text|reply|sent)\b/i.test(raw)) {
+    enScore += 2;
+  }
+
+  if (roScore > enScore) return "ro";
+  if (enScore > roScore) return "en";
+
+  const recentUserMessages = Array.isArray(conversationHistory)
+    ? conversationHistory
+        .filter(
+          (msg) =>
+            msg &&
+            typeof msg === "object" &&
+            msg.role === "user" &&
+            typeof msg.content === "string" &&
+            msg.content.trim()
+        )
+        .slice(-5)
+        .map((msg) => msg.content)
+    : [];
+
+  const historyJoined = recentUserMessages.join(" ");
+  if (/[ăâîșşțţ]/i.test(historyJoined)) {
+    return "ro";
+  }
+
+  return "en";
 }
 
 function getRecentAssistantReplies(conversationHistory) {
@@ -104,15 +191,113 @@ function inferNoReplyFollowUpIntensity(conversationHistory) {
     noReplySignals.some((signal) => reply.includes(signal))
   ).length;
 
-  if (count >= 2) {
-    return 3;
-  }
-
-  if (count === 1) {
-    return 2;
-  }
-
+  if (count >= 2) return 3;
+  if (count === 1) return 2;
   return 1;
+}
+
+function isSoftReplyMessage(text = "") {
+  const softReplySignals = [
+    "a zis",
+    "mi a zis",
+    "mi-a zis",
+    "a spus",
+    "mi a spus",
+    "mi-a spus",
+    "m a intrebat",
+    "m-a intrebat",
+    "m a intrebat daca",
+    "a intrebat",
+    "a raspuns ca",
+    "mi a raspuns ca",
+    "mi-a raspuns ca",
+    "he said",
+    "she said",
+    "they said",
+    "he asked",
+    "she asked",
+    "they asked",
+    "he told me",
+    "she told me",
+    "they told me",
+    "he was like",
+    "she was like",
+  ];
+
+  return softReplySignals.some((signal) => text.includes(signal));
+}
+
+function detectReplyContext(text = "") {
+  const positiveSignals = [
+    "a ras",
+    "a râs",
+    "a zis ca sa iesim",
+    "a zis sa iesim",
+    "a spus sa iesim",
+    "a zis da",
+    "a spus da",
+    "a zis yes",
+    "a zis ca vine",
+    "a zis ca vrea",
+    "a zis ca e bine",
+    "a zis ca suna bine",
+    "m a intrebat cand",
+    "m-a intrebat cand",
+    "m a intrebat unde",
+    "m-a intrebat unde",
+    "m a intrebat daca",
+    "m-a intrebat daca",
+    "he laughed",
+    "she laughed",
+    "they laughed",
+    "he said yes",
+    "she said yes",
+    "they said yes",
+    "he asked when",
+    "she asked when",
+    "they asked when",
+    "he asked where",
+    "she asked where",
+    "they asked where",
+    "he said let s go",
+    "she said let s go",
+    "sounds good",
+    "that works",
+    "lets do it",
+    "let s do it",
+    "wants to go",
+    "asked me out",
+  ];
+
+  const negativeSignals = [
+    "a zis nu",
+    "a spus nu",
+    "a zis ca nu poate",
+    "a spus ca nu poate",
+    "a zis ca nu",
+    "a zis ca e ocupat",
+    "a zis ca e ocupata",
+    "he said no",
+    "she said no",
+    "they said no",
+    "he said he cant",
+    "she said she cant",
+    "cant",
+    "can't",
+    "busy",
+    "not interested",
+    "maybe another time",
+  ];
+
+  if (positiveSignals.some((signal) => text.includes(signal))) {
+    return "positive";
+  }
+
+  if (negativeSignals.some((signal) => text.includes(signal))) {
+    return "negative";
+  }
+
+  return "neutral";
 }
 
 function detectInteractionState(message = "", conversationHistory = []) {
@@ -136,7 +321,6 @@ function detectInteractionState(message = "", conversationHistory = []) {
       "ii trimit acum",
       "ii dau mesaj acum",
       "ii scriu chiar acum",
-      "i write now",
     ],
     sent: [
       "i sent it",
@@ -149,14 +333,13 @@ function detectInteractionState(message = "", conversationHistory = []) {
       "ok sent",
       "okay sent",
       "gata",
-      "i am trimis",
-      "i am dat",
       "tocmai am trimis",
       "am trimis",
       "gata i am dat",
       "gata i am trimis",
+      "ok i am trimis",
     ],
-    replied: [
+    replied_explicit: [
       "he replied",
       "she replied",
       "they replied",
@@ -171,15 +354,17 @@ function detectInteractionState(message = "", conversationHistory = []) {
       "he texted back",
       "she texted back",
       "mi a raspuns",
+      "mi-a raspuns",
       "a raspuns",
+      "a răspuns",
       "mi a scris",
+      "mi-a scris",
       "mi a dat mesaj",
-      "mi a rasp",
+      "mi-a dat mesaj",
     ],
     seen: [
       "left me on seen",
       "left on seen",
-      "seen me",
       "read it and said nothing",
       "saw it and said nothing",
       "no reply",
@@ -188,10 +373,14 @@ function detectInteractionState(message = "", conversationHistory = []) {
       "she ignored me",
       "he ignored me",
       "mi a dat seen",
+      "mi-a dat seen",
       "mi a lasat seen",
+      "mi-a lasat seen",
       "nu mi a raspuns",
+      "nu mi-a raspuns",
       "nu a raspuns",
       "m a ignorat",
+      "m-a ignorat",
     ],
     no_reply_follow_up: [
       "what do i do now",
@@ -234,27 +423,40 @@ function detectInteractionState(message = "", conversationHistory = []) {
       "au trecut 2 zile",
       "au trecut doua zile",
       "inca nu a raspuns",
+      "inca nu a răspuns",
       "tot nu a raspuns",
+      "tot nu a răspuns",
       "tot nu mi a raspuns",
+      "tot nu mi-a raspuns",
       "inca nu mi a raspuns",
+      "inca nu mi-a raspuns",
       "ce fac daca nu raspunde",
     ],
   };
 
   if (patterns.sent.some((pattern) => text.includes(pattern))) {
-    return { type: "live", intent: "sent", intensity: 1 };
+    return { type: "live", intent: "sent", intensity: 1, context: null };
   }
 
-  if (patterns.replied.some((pattern) => text.includes(pattern))) {
-    return { type: "live", intent: "replied", intensity: 1 };
+  if (patterns.replied_explicit.some((pattern) => text.includes(pattern))) {
+    return { type: "live", intent: "replied", intensity: 1, context: "neutral" };
+  }
+
+  if (isSoftReplyMessage(text)) {
+    return {
+      type: "live",
+      intent: "replied",
+      intensity: 1,
+      context: detectReplyContext(text),
+    };
   }
 
   if (patterns.seen.some((pattern) => text.includes(pattern))) {
-    return { type: "live", intent: "seen", intensity: 1 };
+    return { type: "live", intent: "seen", intensity: 1, context: null };
   }
 
   if (patterns.action_now.some((pattern) => text.includes(pattern))) {
-    return { type: "live", intent: "action_now", intensity: 1 };
+    return { type: "live", intent: "action_now", intensity: 1, context: null };
   }
 
   if (patterns.no_reply_follow_up.some((pattern) => text.includes(pattern))) {
@@ -262,25 +464,32 @@ function detectInteractionState(message = "", conversationHistory = []) {
       type: "follow_up",
       intent: "no_reply_follow_up",
       intensity: inferNoReplyFollowUpIntensity(conversationHistory),
+      context: null,
     };
   }
 
-  return { type: "normal", intent: null, intensity: 0 };
+  return { type: "normal", intent: null, intensity: 0, context: null };
 }
 
-function buildLiveMomentSystemHint(intent, intensity = 1) {
+function buildLiveMomentSystemHint(intent, intensity = 1, context = null) {
   switch (intent) {
     case "action_now":
       return `The user's latest message indicates they are about to take action right now. Reply in ONE short sentence only. Sound like a real friend: lightly excited, curious, or invested. Do not give more advice.`;
     case "sent":
       return `The user's latest message indicates they already sent it. Reply in ONE short sentence only. Sound invested and natural. Do not give more advice.`;
     case "replied":
-      return `The user's latest message indicates the other person replied. Reply in ONE short sentence only. React first and ask what they said. Do not assume the reply's tone.`;
+      if (context === "positive") {
+        return `The user's latest message describes a positive reply from the other person. Reply in ONE short sentence only. React naturally and positively first. Do not generate a new text suggestion yet.`;
+      }
+      if (context === "negative") {
+        return `The user's latest message describes a negative or low-interest reply. Reply in ONE short sentence only. Sound calm and grounded. Do not overreact and do not generate a new text suggestion yet.`;
+      }
+      return `The user's latest message indicates the other person replied. Reply in ONE short sentence only. React first and ask what they said, unless the user already described the reply clearly.`;
     case "seen":
       return `The user's latest message indicates they were left on seen or got no reply. Reply in ONE short sentence only. Sound calm, empathetic, and controlled. Do not suggest double texting.`;
     case "no_reply_follow_up":
       if (intensity === 1) {
-        return `The user is following up because there is still no reply. Reply in ONE short sentence only. Tell them calmly not to text again yet. Sound natural, controlled, and human.`;
+        return `The user is following up because there is still no reply. Reply in ONE short sentence only. Tell them calmly not to text again yet.`;
       }
       if (intensity === 2) {
         return `The user is following up again because there is still no reply. Reply in ONE short sentence only. Keep telling them not to chase, but vary the phrasing and sound firmer.`;
@@ -314,6 +523,20 @@ function getInteractionPool(language = "en") {
         "ahh what was the reply",
         "show me the message",
         "okay I need to see this",
+      ],
+      replied_positive: [
+        "ok wait that’s actually good 😭",
+        "oh that’s promising",
+        "okay wait, that sounds good",
+        "not gonna lie, that’s a good sign",
+        "ohh okay, that actually went well",
+      ],
+      replied_negative: [
+        "hmm okay, that’s not amazing",
+        "yeah… that feels a bit flat",
+        "okay, that’s giving low effort",
+        "not ideal, but don’t panic yet",
+        "hmm, I’d slow down a bit here",
       ],
       seen: [
         "ugh okay… don’t panic yet",
@@ -366,6 +589,20 @@ function getInteractionPool(language = "en") {
         "arată-mi mesajul",
         "ok, trebuie să văd ce a zis",
       ],
+      replied_positive: [
+        "stai că asta chiar sună bine 😭",
+        "oh, asta e promițător",
+        "ok, stai, asta sună bine",
+        "nu zic nu, dar e semn bun",
+        "ohh, ok, chiar a mers bine",
+      ],
+      replied_negative: [
+        "hmm ok, asta nu sună grozav",
+        "da… e cam flat",
+        "ok, asta dă energie cam slabă",
+        "nu ideal, dar nu intra în panică încă",
+        "hmm, aici aș încetini puțin",
+      ],
       seen: [
         "ugh ok… nu intra în panică încă",
         "hmm mai lasă-l puțin, nu insista",
@@ -398,11 +635,19 @@ function getInteractionPool(language = "en") {
   }[language] || {};
 }
 
-function getPoolKey(intent, intensity = 1) {
+function getPoolKey(intent, intensity = 1, context = null) {
   if (intent === "no_reply_follow_up") {
     if (intensity >= 3) return "no_reply_follow_up_3";
     if (intensity === 2) return "no_reply_follow_up_2";
     return "no_reply_follow_up_1";
+  }
+
+  if (intent === "replied" && context === "positive") {
+    return "replied_positive";
+  }
+
+  if (intent === "replied" && context === "negative") {
+    return "replied_negative";
   }
 
   return intent;
@@ -411,12 +656,13 @@ function getPoolKey(intent, intensity = 1) {
 function pickAntiRepeatVariant({
   intent,
   intensity,
+  context,
   language,
   conversationHistory,
   fallback,
 }) {
   const poolMap = getInteractionPool(language);
-  const poolKey = getPoolKey(intent, intensity);
+  const poolKey = getPoolKey(intent, intensity, context);
   const pool = poolMap[poolKey] || [];
 
   if (!pool.length) {
@@ -476,7 +722,7 @@ module.exports = async function handler(req, res) {
     }
 
     const trimmedMessage = message.trim();
-    const replyLanguage = detectReplyLanguage(trimmedMessage);
+    const replyLanguage = detectReplyLanguage(trimmedMessage, conversationHistory);
     const interactionState = detectInteractionState(
       trimmedMessage,
       conversationHistory
@@ -769,56 +1015,22 @@ When the user says they are about to take action (texting, sending it, going on 
 - sound lightly excited, curious, or invested
 - do NOT give more advice in that moment
 
-Good vibe:
-- "ok go 😭 tell me what they say"
-- "gooo, I need the update after"
-- "okay send it and come back to me"
-- "yess do it, now tell me everything after"
-
-Avoid:
-- "come back with updates"
-- neutral phrasing
-- robotic tone
-- repeating advice again
-
 --------------------------------------------------
 LIVE MOMENT REACTIONS
 
 If the user says they already sent the message:
-Examples:
-- "I sent it"
-- "I did it"
-- "sent"
-- "gata, i-am dat"
-- "i-am trimis"
-
-Then:
 - respond short (1 sentence)
 - sound invested or curious
 - DO NOT switch back to advice
 
 If the user says the other person replied:
-Examples:
-- "he replied"
-- "she answered"
-- "mi-a raspuns"
-- "a răspuns"
-
-Then:
 - react first
-- ask what they said
-- keep it short
-- DO NOT assume tone before seeing the reply
+- if the user already described what they said, react to that actual context
+- if the reply sounds positive, react positively
+- if the reply sounds flat or negative, react in a grounded way
+- only ask what they said if the message is vague
 
 If the user says they were left on seen / no reply / ignored:
-Examples:
-- "he left me on seen"
-- "she saw it and said nothing"
-- "mi-a dat seen"
-- "nu mi-a răspuns"
-- "no reply"
-
-Then:
 - react with calm empathy
 - keep it short
 - DO NOT panic or dramatize
@@ -930,7 +1142,8 @@ ${conversationSummary.trim()}
     const liveHint = interactionState.intent
       ? buildLiveMomentSystemHint(
           interactionState.intent,
-          interactionState.intensity
+          interactionState.intensity,
+          interactionState.context
         )
       : "";
 
@@ -1005,6 +1218,7 @@ ${conversationSummary.trim()}
       reply = pickAntiRepeatVariant({
         intent: interactionState.intent,
         intensity: interactionState.intensity,
+        context: interactionState.context,
         language: replyLanguage,
         conversationHistory,
         fallback: reply,
@@ -1012,7 +1226,9 @@ ${conversationSummary.trim()}
     }
 
     if (!reply) {
-      reply = "Something went weird. Send that again.";
+      reply = replyLanguage === "ro"
+        ? "A mers ceva prost. Mai trimite o dată."
+        : "Something went weird. Send that again.";
     }
 
     return res.status(200).json({
