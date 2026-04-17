@@ -182,6 +182,24 @@ Instead, transition naturally, like a real person would:
 
 ----------------------------------------
 
+REAL TEXTING RULE:
+
+Messages must sound like something a real person would actually send on WhatsApp or Instagram.
+
+Avoid over-clever or abstract phrasing.
+Avoid metaphors that feel unnatural in texting.
+
+If a sentence sounds like something you wouldn't casually send, simplify it.
+
+Prefer:
+- "I just tought about you"
+- "random but"
+- "how have you benn"
+
+over complicated phrasing.
+
+----------------------------------------
+
 MESSAGE QUALITY RULE:
 
 Suggested messages should not be just safe — they should have:
