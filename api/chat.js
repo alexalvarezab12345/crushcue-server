@@ -13,7 +13,12 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { message, memory, conversationHistory } = req.body || {};
+    const {
+      message,
+      memory,
+      conversationHistory,
+      conversationSummary,
+    } = req.body || {};
 
     if (!message) {
       return res.status(400).json({ error: "Message is required" });
@@ -296,6 +301,59 @@ You are here to:
 - suggest messages that actually make sense in real life
 `;
 
+    // ✅ Optional stable memory from app
+    const summaryContext =
+      typeof conversationSummary === "string" && conversationSummary.trim()
+        ? `
+
+--------------------------------------------------
+CONVERSATION SUMMARY
+
+This is a short summary of what has already happened in the conversation.
+Use it as stable background context, but do not mention it explicitly unless naturally necessary.
+
+${conversationSummary.trim()}
+`
+        : "";
+
+    // ✅ Recent conversation memory from app
+    const safeHistory = Array.isArray(conversationHistory)
+      ? conversationHistory
+          .filter(
+            (msg) =>
+              msg &&
+              typeof msg === "object" &&
+              typeof msg.content === "string" &&
+              msg.content.trim()
+          )
+          .slice(-15)
+          .map((msg) => {
+            const role =
+              msg.role === "assistant" || msg.role === "ai"
+                ? "assistant"
+                : msg.role === "system"
+                ? "system"
+                : "user";
+
+            return {
+              role,
+              content: msg.content.trim(),
+            };
+          })
+      : [];
+
+    const openaiMessages = [
+      {
+        role: "system",
+        content: `${systemPrompt}${summaryContext}`,
+      },
+      ...safeHistory,
+      {
+        role: "user",
+        content: message,
+      },
+    ];
+
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -304,10 +362,7 @@ You are here to:
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message },
-        ],
+        messages: openaiMessages,
       }),
     });
 
@@ -331,7 +386,7 @@ You are here to:
       reply = content
         .filter((part) => typeof part?.text === "string")
         .map((part) => part.text)
-        .join("\\n");
+        .join("\n");
     }
 
     if (!reply) {
