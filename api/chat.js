@@ -1,5 +1,4 @@
 module.exports = async function handler(req, res) {
-  // ✅ CORS FIX
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -242,10 +241,6 @@ The message should feel like:
 
 Wrap ONLY the exact sendable message in quotation marks.
 
-Example:
-"You can say something like:
-'hey, random but what are you up to?'"
-
 Only the actual message should be inside quotes.
 
 --------------------------------------------------
@@ -289,34 +284,46 @@ Never mention it explicitly.
 Never say “based on your settings”.
 
 --------------------------------------------------
-FINAL RULE
+SUMMARY WRITING RULE
 
-You are not here to impress with fancy phrasing.
+You must also maintain a short factual conversation summary for future turns.
 
-You are here to:
-- read the situation accurately
-- understand timing
-- give realistic, socially intelligent guidance
-- make the user feel understood
-- suggest messages that actually make sense in real life
+The summary must:
+- be concise
+- be factual
+- keep important context only
+- track the relationship stage, user goal, recent events, and unresolved status
+- avoid fluff
+- avoid repeating exact full chat text
+- be written in English for consistency, no matter the user's language
+
+--------------------------------------------------
+OUTPUT FORMAT RULE
+
+You MUST return valid JSON with exactly these keys:
+- reply
+- updatedSummary
+
+Example:
+{
+  "reply": "your actual reply here",
+  "updatedSummary": "short factual summary here"
+}
+
+Do not return markdown.
+Do not use code fences.
+Return raw JSON only.
 `;
 
-    // ✅ Optional stable memory from app
     const summaryContext =
       typeof conversationSummary === "string" && conversationSummary.trim()
         ? `
 
---------------------------------------------------
-CONVERSATION SUMMARY
-
-This is a short summary of what has already happened in the conversation.
-Use it as stable background context, but do not mention it explicitly unless naturally necessary.
-
+CURRENT CONVERSATION SUMMARY:
 ${conversationSummary.trim()}
 `
         : "";
 
-    // ✅ Recent conversation memory from app
     const safeHistory = Array.isArray(conversationHistory)
       ? conversationHistory
           .filter(
@@ -363,6 +370,7 @@ ${conversationSummary.trim()}
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         messages: openaiMessages,
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -376,25 +384,36 @@ ${conversationSummary.trim()}
       });
     }
 
-    const content = data?.choices?.[0]?.message?.content;
+    const rawContent = data?.choices?.[0]?.message?.content;
 
     let reply = "";
+    let updatedSummary = typeof conversationSummary === "string" ? conversationSummary : "";
 
-    if (typeof content === "string") {
-      reply = content;
-    } else if (Array.isArray(content)) {
-      reply = content
-        .filter((part) => typeof part?.text === "string")
-        .map((part) => part.text)
-        .join("\n");
+    try {
+      const parsed =
+        typeof rawContent === "string"
+          ? JSON.parse(rawContent)
+          : {};
+
+      if (typeof parsed.reply === "string") {
+        reply = parsed.reply.trim();
+      }
+
+      if (typeof parsed.updatedSummary === "string") {
+        updatedSummary = parsed.updatedSummary.trim();
+      }
+    } catch (parseError) {
+      console.error("JSON PARSE ERROR:", parseError, rawContent);
     }
 
     if (!reply) {
-      console.error("NO REPLY PARSED:", data);
       reply = "I couldn't generate a reply.";
     }
 
-    return res.status(200).json({ reply });
+    return res.status(200).json({
+      reply,
+      updatedSummary,
+    });
   } catch (error) {
     console.error("SERVER ERROR:", error);
     return res.status(500).json({
