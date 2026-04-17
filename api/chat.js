@@ -8,106 +8,268 @@ function normalizeText(text = "") {
     .trim();
 }
 
-function detectLiveMomentType(message = "") {
+function detectReplyLanguage(message = "") {
   const text = normalizeText(message);
 
-  const sentPatterns = [
-    "i sent it",
-    "sent it",
-    "i sent the message",
-    "i did it",
-    "sent",
-    "done",
-    "just sent it",
-    "ok sent",
-    "okay sent",
+  const romanianSignals = [
+    "mi",
+    "raspuns",
+    "trimis",
+    "scriu",
+    "trimit",
+    "acum",
     "gata",
-    "i am trimis",
-    "i am dat",
-    "tocmai am trimis",
-    "am trimis",
-    "gata i am dat",
-    "gata i am trimis",
+    "nu",
+    "dat",
+    "mesaj",
+    "ce",
+    "ii",
+    "mai",
+    "scrie",
+    "astept",
+    "las",
   ];
 
-  const repliedPatterns = [
-    "he replied",
-    "she replied",
-    "they replied",
-    "he answered",
-    "she answered",
-    "they answered",
-    "he responded",
-    "she responded",
-    "they responded",
-    "got a reply",
-    "they texted back",
-    "he texted back",
-    "she texted back",
-    "mi a raspuns",
-    "a raspuns",
-    "mi a scris",
-    "mi a dat mesaj",
-    "mi a rasp",
-  ];
-
-  const seenPatterns = [
-    "left me on seen",
-    "left on seen",
-    "seen me",
-    "read it and said nothing",
-    "saw it and said nothing",
-    "no reply",
-    "no response",
-    "ignored me",
-    "she ignored me",
-    "he ignored me",
-    "mi a dat seen",
-    "mi a lasat seen",
-    "nu mi a raspuns",
-    "nu a raspuns",
-    "m a ignorat",
-  ];
-
-  const actionNowPatterns = [
-    "i m about to send it",
-    "im about to send it",
-    "about to send it",
-    "i ll send it now",
-    "ill send it now",
-    "sending it now",
-    "gonna send it now",
-    "i am sending it now",
-    "send it now",
-    "trimit acum",
-    "ii scriu acum",
-    "i scriu acum",
-    "ii dau acum",
-    "ii trimit acum",
-    "ii dau mesaj acum",
-  ];
-
-  if (sentPatterns.some((pattern) => text.includes(pattern))) {
-    return "sent";
+  const hasRomanianDiacritics = /[ăâîșşțţ]/i.test(message);
+  if (hasRomanianDiacritics) {
+    return "ro";
   }
 
-  if (repliedPatterns.some((pattern) => text.includes(pattern))) {
-    return "replied";
-  }
+  const words = text.split(" ");
+  const score = romanianSignals.reduce(
+    (acc, word) => acc + (words.includes(word) ? 1 : 0),
+    0
+  );
 
-  if (seenPatterns.some((pattern) => text.includes(pattern))) {
-    return "seen";
-  }
-
-  if (actionNowPatterns.some((pattern) => text.includes(pattern))) {
-    return "action_now";
-  }
-
-  return null;
+  return score >= 2 ? "ro" : "en";
 }
 
-function buildLiveMomentSystemHint(type) {
-  switch (type) {
+function getRecentAssistantReplies(conversationHistory) {
+  if (!Array.isArray(conversationHistory)) {
+    return [];
+  }
+
+  return conversationHistory
+    .filter(
+      (msg) =>
+        msg &&
+        typeof msg === "object" &&
+        (msg.role === "assistant" || msg.role === "ai") &&
+        typeof msg.content === "string" &&
+        msg.content.trim()
+    )
+    .slice(-12)
+    .map((msg) => normalizeText(msg.content));
+}
+
+function inferNoReplyFollowUpIntensity(conversationHistory) {
+  if (!Array.isArray(conversationHistory)) {
+    return 1;
+  }
+
+  const assistantReplies = conversationHistory
+    .filter(
+      (msg) =>
+        msg &&
+        typeof msg === "object" &&
+        (msg.role === "assistant" || msg.role === "ai") &&
+        typeof msg.content === "string" &&
+        msg.content.trim()
+    )
+    .map((msg) => normalizeText(msg.content));
+
+  const noReplySignals = [
+    "dont double text",
+    "don t double text",
+    "no double text",
+    "dont chase",
+    "don t chase",
+    "leave it for now",
+    "we wait",
+    "wait it out",
+    "give it a bit",
+    "not yet",
+    "still no reply",
+    "nu insista",
+    "fara dublu mesaj",
+    "fara al doilea mesaj",
+    "asteptam",
+    "mai lasa l",
+    "mai lasa l putin",
+    "nu i mai scrie",
+    "nu ii mai scrie",
+  ];
+
+  const count = assistantReplies.filter((reply) =>
+    noReplySignals.some((signal) => reply.includes(signal))
+  ).length;
+
+  if (count >= 2) {
+    return 3;
+  }
+
+  if (count === 1) {
+    return 2;
+  }
+
+  return 1;
+}
+
+function detectInteractionState(message = "", conversationHistory = []) {
+  const text = normalizeText(message);
+
+  const patterns = {
+    action_now: [
+      "i m about to send it",
+      "im about to send it",
+      "about to send it",
+      "i ll send it now",
+      "ill send it now",
+      "sending it now",
+      "gonna send it now",
+      "i am sending it now",
+      "send it now",
+      "trimit acum",
+      "ii scriu acum",
+      "i scriu acum",
+      "ii dau acum",
+      "ii trimit acum",
+      "ii dau mesaj acum",
+      "ii scriu chiar acum",
+      "i write now",
+    ],
+    sent: [
+      "i sent it",
+      "sent it",
+      "i sent the message",
+      "i did it",
+      "sent",
+      "done",
+      "just sent it",
+      "ok sent",
+      "okay sent",
+      "gata",
+      "i am trimis",
+      "i am dat",
+      "tocmai am trimis",
+      "am trimis",
+      "gata i am dat",
+      "gata i am trimis",
+    ],
+    replied: [
+      "he replied",
+      "she replied",
+      "they replied",
+      "he answered",
+      "she answered",
+      "they answered",
+      "he responded",
+      "she responded",
+      "they responded",
+      "got a reply",
+      "they texted back",
+      "he texted back",
+      "she texted back",
+      "mi a raspuns",
+      "a raspuns",
+      "mi a scris",
+      "mi a dat mesaj",
+      "mi a rasp",
+    ],
+    seen: [
+      "left me on seen",
+      "left on seen",
+      "seen me",
+      "read it and said nothing",
+      "saw it and said nothing",
+      "no reply",
+      "no response",
+      "ignored me",
+      "she ignored me",
+      "he ignored me",
+      "mi a dat seen",
+      "mi a lasat seen",
+      "nu mi a raspuns",
+      "nu a raspuns",
+      "m a ignorat",
+    ],
+    no_reply_follow_up: [
+      "what do i do now",
+      "what now",
+      "should i text again",
+      "should i message again",
+      "should i send another message",
+      "do i text again",
+      "do i send another message",
+      "can i text again",
+      "can i send another message",
+      "should i follow up",
+      "do i follow up",
+      "what should i say now",
+      "what do i say now",
+      "its been a day",
+      "it s been a day",
+      "its been 2 days",
+      "it s been 2 days",
+      "its been two days",
+      "it s been two days",
+      "still no reply",
+      "still no response",
+      "still nothing",
+      "what should i do",
+      "ce fac acum",
+      "ce fac",
+      "ii mai scriu",
+      "i mai scriu",
+      "sa i mai scriu",
+      "sa ii mai scriu",
+      "ii dau mesaj iar",
+      "i dau mesaj iar",
+      "ii mai dau mesaj",
+      "mai dau mesaj",
+      "mai scriu ceva",
+      "ce sa fac acum",
+      "ce sa zic acum",
+      "a trecut o zi",
+      "au trecut 2 zile",
+      "au trecut doua zile",
+      "inca nu a raspuns",
+      "tot nu a raspuns",
+      "tot nu mi a raspuns",
+      "inca nu mi a raspuns",
+      "ce fac daca nu raspunde",
+    ],
+  };
+
+  if (patterns.sent.some((pattern) => text.includes(pattern))) {
+    return { type: "live", intent: "sent", intensity: 1 };
+  }
+
+  if (patterns.replied.some((pattern) => text.includes(pattern))) {
+    return { type: "live", intent: "replied", intensity: 1 };
+  }
+
+  if (patterns.seen.some((pattern) => text.includes(pattern))) {
+    return { type: "live", intent: "seen", intensity: 1 };
+  }
+
+  if (patterns.action_now.some((pattern) => text.includes(pattern))) {
+    return { type: "live", intent: "action_now", intensity: 1 };
+  }
+
+  if (patterns.no_reply_follow_up.some((pattern) => text.includes(pattern))) {
+    return {
+      type: "follow_up",
+      intent: "no_reply_follow_up",
+      intensity: inferNoReplyFollowUpIntensity(conversationHistory),
+    };
+  }
+
+  return { type: "normal", intent: null, intensity: 0 };
+}
+
+function buildLiveMomentSystemHint(intent, intensity = 1) {
+  switch (intent) {
     case "action_now":
       return `The user's latest message indicates they are about to take action right now. Reply in ONE short sentence only. Sound like a real friend: lightly excited, curious, or invested. Do not give more advice.`;
     case "sent":
@@ -116,9 +278,175 @@ function buildLiveMomentSystemHint(type) {
       return `The user's latest message indicates the other person replied. Reply in ONE short sentence only. React first and ask what they said. Do not assume the reply's tone.`;
     case "seen":
       return `The user's latest message indicates they were left on seen or got no reply. Reply in ONE short sentence only. Sound calm, empathetic, and controlled. Do not suggest double texting.`;
+    case "no_reply_follow_up":
+      if (intensity === 1) {
+        return `The user is following up because there is still no reply. Reply in ONE short sentence only. Tell them calmly not to text again yet. Sound natural, controlled, and human.`;
+      }
+      if (intensity === 2) {
+        return `The user is following up again because there is still no reply. Reply in ONE short sentence only. Keep telling them not to chase, but vary the phrasing and sound firmer.`;
+      }
+      return `The user is following up again after repeated no-reply frustration. Reply in ONE short sentence only. You may allow a very light casual follow-up only if phrased with zero pressure, otherwise tell them to leave it.`;
     default:
       return "";
   }
+}
+
+function getInteractionPool(language = "en") {
+  return {
+    en: {
+      action_now: [
+        "ok go 😭 tell me what they say",
+        "gooo, I need the update after",
+        "okay send it and come back to me",
+        "yess do it, now tell me everything after",
+        "alright go, I’m curious now",
+      ],
+      sent: [
+        "okayy 😭 now we wait",
+        "good, now tell me the second they reply",
+        "ok I’m invested now 😭",
+        "nice, keep me posted",
+        "okay, now we wait",
+      ],
+      replied: [
+        "wait what did they say",
+        "ok send me exactly what they said",
+        "ahh what was the reply",
+        "show me the message",
+        "okay I need to see this",
+      ],
+      seen: [
+        "ugh okay… don’t panic yet",
+        "hmm give it a bit, don’t chase",
+        "okay… we wait, no double text",
+        "annoying, but don’t react yet",
+        "leave it for now, don’t push it",
+      ],
+      no_reply_follow_up_1: [
+        "still no reply? yeah… leave it for now",
+        "nah, don’t text again yet",
+        "give it more time, don’t push it",
+        "not yet, leave it alone for now",
+        "still nothing? then don’t chase it",
+      ],
+      no_reply_follow_up_2: [
+        "yeah I know it’s annoying… still don’t text",
+        "ugh I get it, but don’t double text",
+        "you’ve done your part, now leave it",
+        "don’t ruin it now by double texting 😭",
+        "stay strong, no second message",
+      ],
+      no_reply_follow_up_3: [
+        "if you really want to, only send something light",
+        "okay, only if it’s super casual",
+        "you can send one chill follow-up, nothing heavy",
+        "only if it’s light, not a ‘why didn’t you reply’ text",
+        "if you text, keep it breezy and low-pressure",
+      ],
+    },
+    ro: {
+      action_now: [
+        "ok du-te 😭 zi-mi imediat ce zice",
+        "hai trimite și revino cu update",
+        "ok dă-i acum și spune-mi după",
+        "yess, trimite și zi-mi tot după",
+        "ok, acum chiar vreau să știu ce răspunde",
+      ],
+      sent: [
+        "okayy 😭 acum așteptăm",
+        "bun, acum să-mi spui imediat dacă răspunde",
+        "ok, acum sunt invested 😭",
+        "nice, ține-mă la curent",
+        "ok, acum vedem ce face",
+      ],
+      replied: [
+        "stai ce a zis",
+        "ok, dă-mi exact ce a zis",
+        "ahh, care a fost răspunsul",
+        "arată-mi mesajul",
+        "ok, trebuie să văd ce a zis",
+      ],
+      seen: [
+        "ugh ok… nu intra în panică încă",
+        "hmm mai lasă-l puțin, nu insista",
+        "ok… așteptăm, fără dublu mesaj",
+        "enervant, dar nu reacționa încă",
+        "lasă-l puțin în pace, nu forța acum",
+      ],
+      no_reply_follow_up_1: [
+        "tot nu răspunde? da, lasă-l puțin",
+        "nu, nu-i mai scrie încă",
+        "mai dă-i timp, nu forța",
+        "încă nu, lasă-l în pace momentan",
+        "dacă tot nu răspunde, nu insista",
+      ],
+      no_reply_follow_up_2: [
+        "știu că e enervant… dar tot nu-i mai scrie",
+        "ugh înțeleg, dar fără dublu mesaj",
+        "tu ți-ai făcut partea, acum lasă-l",
+        "nu strica acum totul cu încă un mesaj 😭",
+        "rezistă, fără al doilea mesaj",
+      ],
+      no_reply_follow_up_3: [
+        "dacă chiar vrei, doar ceva foarte light",
+        "ok, doar dacă e super casual",
+        "poți da un follow-up chill, nimic intens",
+        "doar să nu fie gen «de ce nu răspunzi»",
+        "dacă mai scrii, fă-o foarte lejer",
+      ],
+    },
+  }[language] || {};
+}
+
+function getPoolKey(intent, intensity = 1) {
+  if (intent === "no_reply_follow_up") {
+    if (intensity >= 3) return "no_reply_follow_up_3";
+    if (intensity === 2) return "no_reply_follow_up_2";
+    return "no_reply_follow_up_1";
+  }
+
+  return intent;
+}
+
+function pickAntiRepeatVariant({
+  intent,
+  intensity,
+  language,
+  conversationHistory,
+  fallback,
+}) {
+  const poolMap = getInteractionPool(language);
+  const poolKey = getPoolKey(intent, intensity);
+  const pool = poolMap[poolKey] || [];
+
+  if (!pool.length) {
+    return fallback || "";
+  }
+
+  const recentReplies = getRecentAssistantReplies(conversationHistory);
+  const normalizedFallback = normalizeText(fallback || "");
+
+  const fresh = pool.find((variant) => {
+    const normalizedVariant = normalizeText(variant);
+    return (
+      !recentReplies.includes(normalizedVariant) &&
+      normalizedVariant !== normalizedFallback
+    );
+  });
+
+  if (fresh) {
+    return fresh;
+  }
+
+  const differentFromFallback = pool.find(
+    (variant) => normalizeText(variant) !== normalizedFallback
+  );
+
+  if (differentFromFallback) {
+    return differentFromFallback;
+  }
+
+  return pool[0];
 }
 
 module.exports = async function handler(req, res) {
@@ -148,8 +476,11 @@ module.exports = async function handler(req, res) {
     }
 
     const trimmedMessage = message.trim();
-    const liveMomentType = detectLiveMomentType(trimmedMessage);
-    const liveMomentSystemHint = buildLiveMomentSystemHint(liveMomentType);
+    const replyLanguage = detectReplyLanguage(trimmedMessage);
+    const interactionState = detectInteractionState(
+      trimmedMessage,
+      conversationHistory
+    );
 
     const preferredTone = memory?.preferredTone || "Classy";
     const currentSituation = memory?.currentSituation || "";
@@ -466,12 +797,6 @@ Then:
 - sound invested or curious
 - DO NOT switch back to advice
 
-Good vibe:
-- "okayy 😭 now we wait"
-- "good, now tell me the second they reply"
-- "ok I’m invested now 😭"
-- "nice, keep me posted"
-
 If the user says the other person replied:
 Examples:
 - "he replied"
@@ -484,12 +809,6 @@ Then:
 - ask what they said
 - keep it short
 - DO NOT assume tone before seeing the reply
-
-Good vibe:
-- "wait what did they say"
-- "ok send me exactly what they said"
-- "ahh what was the reply"
-- "show me the message"
 
 If the user says they were left on seen / no reply / ignored:
 Examples:
@@ -505,11 +824,12 @@ Then:
 - DO NOT panic or dramatize
 - DO NOT suggest double texting
 
-Good vibe:
-- "ugh okay… don’t panic yet"
-- "hmm give it a bit, don’t chase"
-- "okay… we wait, no double text"
-- "annoying, but don’t react yet"
+If the user follows up again after still getting no reply:
+- vary the phrasing
+- keep it short
+- first keep telling them to wait
+- if they keep pushing after multiple turns, you may allow one very light, casual follow-up
+- never suggest pressure, guilt, or "why didn’t you reply" messages
 
 --------------------------------------------------
 BOUNDARIES
@@ -607,16 +927,23 @@ ${conversationSummary.trim()}
           })
       : [];
 
+    const liveHint = interactionState.intent
+      ? buildLiveMomentSystemHint(
+          interactionState.intent,
+          interactionState.intensity
+        )
+      : "";
+
     const openaiMessages = [
       {
         role: "system",
         content: `${systemPrompt}${summaryContext}`,
       },
-      ...(liveMomentSystemHint
+      ...(liveHint
         ? [
             {
               role: "system",
-              content: liveMomentSystemHint,
+              content: liveHint,
             },
           ]
         : []),
@@ -672,6 +999,16 @@ ${conversationSummary.trim()}
       }
     } catch (parseError) {
       console.error("JSON PARSE ERROR:", parseError, rawContent);
+    }
+
+    if (interactionState.type === "live" || interactionState.type === "follow_up") {
+      reply = pickAntiRepeatVariant({
+        intent: interactionState.intent,
+        intensity: interactionState.intensity,
+        language: replyLanguage,
+        conversationHistory,
+        fallback: reply,
+      });
     }
 
     if (!reply) {
