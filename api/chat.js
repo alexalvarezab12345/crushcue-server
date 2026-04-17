@@ -8,11 +8,19 @@ function normalizeText(text = "") {
     .trim();
 }
 
-function detectReplyLanguage(message = "", conversationHistory = []) {
+function detectLastMessageLanguage(message = "") {
   const raw = String(message || "");
   const text = normalizeText(raw);
 
+  if (!text) {
+    return "en";
+  }
+
   if (/[ăâîșşțţ]/i.test(raw)) {
+    return "ro";
+  }
+
+  if (/\b(i-am|mi-a|ti-a|m-a|s-a|i a|mi a|ti a|m a|s a)\b/i.test(raw)) {
     return "ro";
   }
 
@@ -44,19 +52,22 @@ function detectReplyLanguage(message = "", conversationHistory = []) {
     "mesaj",
     "vrei",
     "vreau",
-    "mi",
-    "ti",
-    "i",
-    "ii",
     "nu",
-    "da",
     "inca",
     "tot",
     "las",
     "astept",
     "vedem",
-    "maine",
     "poate",
+    "a",
+    "am",
+    "ai",
+    "ii",
+    "i",
+    "mi",
+    "ti",
+    "sa-mi",
+    "nu-i",
   ];
 
   const englishWords = [
@@ -85,7 +96,12 @@ function detectReplyLanguage(message = "", conversationHistory = []) {
     "today",
     "still",
     "nothing",
-    "what do i do",
+    "left",
+    "seen",
+    "forgot",
+    "situation",
+    "mean",
+    "exactly",
   ];
 
   const words = text.split(" ").filter(Boolean);
@@ -98,36 +114,11 @@ function detectReplyLanguage(message = "", conversationHistory = []) {
     if (englishWords.includes(word)) enScore += 1;
   }
 
-  if (/\b(i-am|mi-a|ti-a|m-a|s-a|i a|mi a|ti a|m a|s a)\b/i.test(raw)) {
-    roScore += 3;
-  }
-
-  if (/\b(he|she|they|what|should|text|reply|sent)\b/i.test(raw)) {
+  if (/\b(he|she|they|what|should|text|reply|sent|forgot|situation|mean)\b/i.test(raw)) {
     enScore += 2;
   }
 
   if (roScore > enScore) return "ro";
-  if (enScore > roScore) return "en";
-
-  const recentUserMessages = Array.isArray(conversationHistory)
-    ? conversationHistory
-        .filter(
-          (msg) =>
-            msg &&
-            typeof msg === "object" &&
-            msg.role === "user" &&
-            typeof msg.content === "string" &&
-            msg.content.trim()
-        )
-        .slice(-5)
-        .map((msg) => msg.content)
-    : [];
-
-  const historyJoined = recentUserMessages.join(" ");
-  if (/[ăâîșşțţ]/i.test(historyJoined)) {
-    return "ro";
-  }
-
   return "en";
 }
 
@@ -338,6 +329,7 @@ function detectInteractionState(message = "", conversationHistory = []) {
       "gata i am dat",
       "gata i am trimis",
       "ok i am trimis",
+      "ok i-am trimis",
     ],
     replied_explicit: [
       "he replied",
@@ -385,6 +377,7 @@ function detectInteractionState(message = "", conversationHistory = []) {
     no_reply_follow_up: [
       "what do i do now",
       "what now",
+      "what to do",
       "should i text again",
       "should i message again",
       "should i send another message",
@@ -722,7 +715,7 @@ module.exports = async function handler(req, res) {
     }
 
     const trimmedMessage = message.trim();
-    const replyLanguage = detectReplyLanguage(trimmedMessage, conversationHistory);
+    const replyLanguage = detectLastMessageLanguage(trimmedMessage);
     const interactionState = detectInteractionState(
       trimmedMessage,
       conversationHistory
@@ -1226,9 +1219,10 @@ ${conversationSummary.trim()}
     }
 
     if (!reply) {
-      reply = replyLanguage === "ro"
-        ? "A mers ceva prost. Mai trimite o dată."
-        : "Something went weird. Send that again.";
+      reply =
+        replyLanguage === "ro"
+          ? "A mers ceva prost. Mai trimite o dată."
+          : "Something went weird. Send that again.";
     }
 
     return res.status(200).json({
