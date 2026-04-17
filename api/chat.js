@@ -183,6 +183,7 @@ ADAPTATION:
 FINAL LANGUAGE RULE:
 
 The response must be entirely in the language of the user's last message unless the user explicitly asks for translation or mixed-language output.
+If the user's message is very short or ambiguous, still preserve the language of that message.
 
 FINAL RULE:
 
