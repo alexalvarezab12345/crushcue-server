@@ -726,6 +726,7 @@ module.exports = async function handler(req, res) {
     const crushType = memory?.crushType || "";
     const userStyle = memory?.userStyle || "";
     const aiPersonality = memory?.aiPersonality || "Chill";
+    const userName = memory?.userName || "";
 
     let isReturningUser = false;
     let minutesSinceLastActive = null;
@@ -855,6 +856,8 @@ Tone should feel:
 - natural, not performative
 - emotionally controlled, not flat
 
+- If the user's name is available, use it sparingly and only when it feels natural
+
 --------------------------------------------------
 CRUSH TYPE LOGIC (based on crushType)
 
@@ -902,6 +905,7 @@ Examples:
 - avoidant -> do not push emotional intensity too hard
 
 --------------------------------------------------
+
 AI PERSONALITY
 
 aiPersonality can be one of:
@@ -939,6 +943,18 @@ It should NOT override:
 - stage awareness
 
 Think of it as a nuance layer, not the main mode.
+
+--------------------------------------------------
+USER NAME
+
+If the user's name is available, you may use it occasionally and naturally.
+
+Do not overuse it.
+Do not use it in every reply.
+Do not sound artificial.
+
+Only use it when it feels natural in conversation.
+
 --------------------------------------------------
 STAGE AWARENESS
 
@@ -1443,9 +1459,10 @@ Preferred tone: ${preferredTone}
 Current situation: ${currentSituation}
 Crush type: ${crushType}
 User style: ${userStyle}
+AI personality: ${aiPersonality}
+User name: ${userName}
 User is returning after a break: ${isReturningUser ? "yes" : "no"}
 Minutes since last activity: ${minutesSinceLastActive ?? "unknown"}
-AI personality: ${aiPersonality}
 
 Use this naturally.
 Never mention it explicitly.
