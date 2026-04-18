@@ -114,7 +114,11 @@ function detectLastMessageLanguage(message = "") {
     if (englishWords.includes(word)) enScore += 1;
   }
 
-  if (/\b(he|she|they|what|should|text|reply|sent|forgot|situation|mean)\b/i.test(raw)) {
+  if (
+    /\b(he|she|they|what|should|text|reply|sent|forgot|situation|mean)\b/i.test(
+      raw
+    )
+  ) {
     enScore += 2;
   }
 
@@ -493,199 +497,32 @@ function buildLiveMomentSystemHint(intent, intensity = 1, context = null) {
   }
 }
 
-function getInteractionPool(language = "en") {
-  return {
-    en: {
-      action_now: [
-        "ok go 😭 tell me what they say",
-        "gooo, I need the update after",
-        "okay send it and come back to me",
-        "yess do it, now tell me everything after",
-        "alright go, I’m curious now",
-      ],
-      sent: [
-        "okayy 😭 now we wait",
-        "good, now tell me the second they reply",
-        "ok I’m invested now 😭",
-        "nice, keep me posted",
-        "okay, now we wait",
-      ],
-      replied: [
-        "wait what did they say",
-        "ok send me exactly what they said",
-        "ahh what was the reply",
-        "show me the message",
-        "okay I need to see this",
-      ],
-      replied_positive: [
-        "ok wait that’s actually good 😭",
-        "oh that’s promising",
-        "okay wait, that sounds good",
-        "not gonna lie, that’s a good sign",
-        "ohh okay, that actually went well",
-      ],
-      replied_negative: [
-        "hmm okay, that’s not amazing",
-        "yeah… that feels a bit flat",
-        "okay, that’s giving low effort",
-        "not ideal, but don’t panic yet",
-        "hmm, I’d slow down a bit here",
-      ],
-      seen: [
-        "ugh okay… don’t panic yet",
-        "hmm give it a bit, don’t chase",
-        "okay… we wait, no double text",
-        "annoying, but don’t react yet",
-        "leave it for now, don’t push it",
-      ],
-      no_reply_follow_up_1: [
-        "still no reply? yeah… leave it for now",
-        "nah, don’t text again yet",
-        "give it more time, don’t push it",
-        "not yet, leave it alone for now",
-        "still nothing? then don’t chase it",
-      ],
-      no_reply_follow_up_2: [
-        "yeah I know it’s annoying… still don’t text",
-        "ugh I get it, but don’t double text",
-        "you’ve done your part, now leave it",
-        "don’t ruin it now by double texting 😭",
-        "stay strong, no second message",
-      ],
-      no_reply_follow_up_3: [
-        "if you really want to, only send something light",
-        "okay, only if it’s super casual",
-        "you can send one chill follow-up, nothing heavy",
-        "only if it’s light, not a ‘why didn’t you reply’ text",
-        "if you text, keep it breezy and low-pressure",
-      ],
-    },
-    ro: {
-      action_now: [
-        "ok du-te 😭 zi-mi imediat ce zice",
-        "hai trimite și revino cu update",
-        "ok dă-i acum și spune-mi după",
-        "yess, trimite și zi-mi tot după",
-        "ok, acum chiar vreau să știu ce răspunde",
-      ],
-      sent: [
-        "okayy 😭 acum așteptăm",
-        "bun, acum să-mi spui imediat dacă răspunde",
-        "ok, acum sunt invested 😭",
-        "nice, ține-mă la curent",
-        "ok, acum vedem ce face",
-      ],
-      replied: [
-        "stai ce a zis",
-        "ok, dă-mi exact ce a zis",
-        "ahh, care a fost răspunsul",
-        "arată-mi mesajul",
-        "ok, trebuie să văd ce a zis",
-      ],
-      replied_positive: [
-        "stai că asta chiar sună bine 😭",
-        "oh, asta e promițător",
-        "ok, stai, asta sună bine",
-        "nu zic nu, dar e semn bun",
-        "ohh, ok, chiar a mers bine",
-      ],
-      replied_negative: [
-        "hmm ok, asta nu sună grozav",
-        "da… e cam flat",
-        "ok, asta dă energie cam slabă",
-        "nu ideal, dar nu intra în panică încă",
-        "hmm, aici aș încetini puțin",
-      ],
-      seen: [
-        "ugh ok… nu intra în panică încă",
-        "hmm mai lasă-l puțin, nu insista",
-        "ok… așteptăm, fără dublu mesaj",
-        "enervant, dar nu reacționa încă",
-        "lasă-l puțin în pace, nu forța acum",
-      ],
-      no_reply_follow_up_1: [
-        "tot nu răspunde? da, lasă-l puțin",
-        "nu, nu-i mai scrie încă",
-        "mai dă-i timp, nu forța",
-        "încă nu, lasă-l în pace momentan",
-        "dacă tot nu răspunde, nu insista",
-      ],
-      no_reply_follow_up_2: [
-        "știu că e enervant… dar tot nu-i mai scrie",
-        "ugh înțeleg, dar fără dublu mesaj",
-        "tu ți-ai făcut partea, acum lasă-l",
-        "nu strica acum totul cu încă un mesaj 😭",
-        "rezistă, fără al doilea mesaj",
-      ],
-      no_reply_follow_up_3: [
-        "dacă chiar vrei, doar ceva foarte light",
-        "ok, doar dacă e super casual",
-        "poți da un follow-up chill, nimic intens",
-        "doar să nu fie gen «de ce nu răspunzi»",
-        "dacă mai scrii, fă-o foarte lejer",
-      ],
-    },
-  }[language] || {};
+function getLimitMessage(language = "en") {
+  if (language === "ro") {
+    return "Ok, fix acum începea să devină interesant 😅 Upgrade la premium ca să continui și să deblochezi răspunsuri mai bune.";
+  }
+
+  return "Okay, this was just getting interesting 😅 Upgrade to premium to keep going and unlock better replies.";
 }
 
-function getPoolKey(intent, intensity = 1, context = null) {
-  if (intent === "no_reply_follow_up") {
-    if (intensity >= 3) return "no_reply_follow_up_3";
-    if (intensity === 2) return "no_reply_follow_up_2";
-    return "no_reply_follow_up_1";
+function getLimitWarningMessage(remaining, language = "en") {
+  if (remaining <= 0) {
+    return getLimitMessage(language);
   }
 
-  if (intent === "replied" && context === "positive") {
-    return "replied_positive";
+  if (language === "ro") {
+    if (remaining === 1) {
+      return "Mai ai 1 mesaj free azi 💜 După asta, treci pe premium ca să continui.";
+    }
+
+    return `Mai ai ${remaining} mesaje free azi 💜`;
   }
 
-  if (intent === "replied" && context === "negative") {
-    return "replied_negative";
+  if (remaining === 1) {
+    return "You have 1 free message left today 💜 After that, you'll need premium to keep going.";
   }
 
-  return intent;
-}
-
-function pickAntiRepeatVariant({
-  intent,
-  intensity,
-  context,
-  language,
-  conversationHistory,
-  fallback,
-}) {
-  const poolMap = getInteractionPool(language);
-  const poolKey = getPoolKey(intent, intensity, context);
-  const pool = poolMap[poolKey] || [];
-
-  if (!pool.length) {
-    return fallback || "";
-  }
-
-  const recentReplies = getRecentAssistantReplies(conversationHistory);
-  const normalizedFallback = normalizeText(fallback || "");
-
-  const fresh = pool.find((variant) => {
-    const normalizedVariant = normalizeText(variant);
-    return (
-      !recentReplies.includes(normalizedVariant) &&
-      normalizedVariant !== normalizedFallback
-    );
-  });
-
-  if (fresh) {
-    return fresh;
-  }
-
-  const differentFromFallback = pool.find(
-    (variant) => normalizeText(variant) !== normalizedFallback
-  );
-
-  if (differentFromFallback) {
-    return differentFromFallback;
-  }
-
-  return pool[0];
+  return `You have ${remaining} free messages left today 💜`;
 }
 
 module.exports = async function handler(req, res) {
@@ -727,6 +564,27 @@ module.exports = async function handler(req, res) {
     const userStyle = memory?.userStyle || "";
     const aiPersonality = memory?.aiPersonality || "Chill";
     const userName = memory?.userName || "";
+    const messageCount = Number(memory?.messageCount || 0);
+    const isPremiumFromClient = memory?.isPremium === true;
+
+    const isDevUser = ["alessia", "test", "admin"].includes(
+      String(userName).trim().toLowerCase()
+    );
+
+    const isPremium = isPremiumFromClient || isDevUser;
+    const FREE_DAILY_LIMIT = 15;
+
+    if (!isPremium && messageCount >= FREE_DAILY_LIMIT) {
+      return res.status(200).json({
+        reply: getLimitMessage(replyLanguage),
+        updatedSummary:
+          typeof conversationSummary === "string" ? conversationSummary : "",
+        locked: true,
+        isPremium: false,
+        messageCount,
+        remainingFreeMessages: 0,
+      });
+    }
 
     let isReturningUser = false;
     let minutesSinceLastActive = null;
@@ -905,7 +763,6 @@ Examples:
 - avoidant -> do not push emotional intensity too hard
 
 --------------------------------------------------
-
 AI PERSONALITY
 
 aiPersonality can be one of:
@@ -943,6 +800,31 @@ It should NOT override:
 - stage awareness
 
 Think of it as a nuance layer, not the main mode.
+
+--------------------------------------------------
+ACTIONABLE HELP RULE
+
+The assistant should not end the situation too quickly or give final conclusions like:
+"move on", "let it go", "forget them" unless the situation is clearly extreme.
+
+In most cases, the user is looking for:
+- what to do next
+- how to respond
+- what message to send
+
+The assistant should:
+- guide the user step by step
+- suggest next moves
+- offer message ideas when appropriate
+
+If the user is unsure, the assistant should gently move toward:
+"here’s what you can do next"
+
+Avoid shutting down the situation too early.
+
+If the user sounds uncertain or asks what to do:
+- give a clear next step
+- optionally suggest a message they can send
 
 --------------------------------------------------
 USER NAME
@@ -1092,7 +974,6 @@ If the user follows up again after still getting no reply:
 - never suggest pressure, guilt, or "why didn’t you reply" messages
 
 --------------------------------------------------
-
 NATURAL REACTION ENGINE (CRITICAL)
 
 When a live moment is detected (sending, sent, reply, seen, no reply follow-up):
@@ -1147,7 +1028,6 @@ You must show progression in thinking.
 
 Each reply should feel like a continuation, not a reset.
 
-
 --------------------------------------------------
 DECISION SHIFT (CRITICAL)
 
@@ -1168,7 +1048,6 @@ Do NOT stay stuck in passive advice.
 The conversation must progress.
 
 --------------------------------------------------
-
 REPEAT PRESSURE HANDLING (CRITICAL)
 
 If the user asks the same question again (e.g. "what should I do?" multiple times):
@@ -1190,6 +1069,7 @@ Examples:
 - “if you text now, it’ll look like you’re waiting — I wouldn’t”
 
 The reply must feel like progression, not repetition.
+
 --------------------------------------------------
 Avoid repeating passive advice like:
 "give it time", "wait more", "be patient"
@@ -1213,7 +1093,6 @@ Vary:
 - strategy
 
 --------------------------------------------------
-
 ANTI-REPETITION BOOST
 
 You MUST actively avoid repeating:
@@ -1286,6 +1165,7 @@ Even if the conversation was mixed before:
 → only match the last message language
 
 This rule is absolute.
+
 --------------------------------------------------
 REAL FRIEND DECISION MODE (CRITICAL)
 
@@ -1312,8 +1192,8 @@ Examples of tone:
 - “if you do text, keep it very chill”
 
 The reply should feel like a real friend’s instinct, not a careful explanation.
---------------------------------------------------
 
+--------------------------------------------------
 CONTEXT ANCHORING (CRITICAL)
 
 Always interpret the user's latest message in the context of the ongoing situation.
@@ -1327,7 +1207,7 @@ If the user takes an action (e.g. "I texted him", "I sent something"):
 
 Example:
 
-If context = no reply + tension  
+If context = no reply + tension
 and user says:
 "I messaged him sorry I failed"
 
@@ -1352,6 +1232,7 @@ Avoid generic advice phrasing like:
 "give it time", "be patient", "let's see"
 
 Replace with more natural, conversational phrasing.
+
 --------------------------------------------------
 NO UNNECESSARY QUESTIONS (CRITICAL)
 
@@ -1375,6 +1256,7 @@ Only ask questions if:
 
 Otherwise:
 → react, interpret, and guide
+
 --------------------------------------------------
 DAMAGE CONTROL MODE (CRITICAL)
 
@@ -1414,6 +1296,7 @@ The goal is:
 
 If the user asks for help after making a mistake:
 → you should prioritize giving a practical next step
+
 --------------------------------------------------
 NO INVESTIGATION MODE (CRITICAL)
 
@@ -1562,19 +1445,22 @@ ${conversationSummary.trim()}
       },
     ];
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        messages: openaiMessages,
-        response_format: { type: "json_object" },
-        temperature: 0.9,
-      }),
-    });
+    const openaiResponse = await fetch(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4.1-mini",
+          messages: openaiMessages,
+          response_format: { type: "json_object" },
+          temperature: 0.9,
+        }),
+      }
+    );
 
     const data = await openaiResponse.json();
 
@@ -1616,9 +1502,31 @@ ${conversationSummary.trim()}
           : "Something went weird. Send that again.";
     }
 
+    const nextMessageCount = isPremium ? messageCount : messageCount + 1;
+    const remainingFreeMessages = isPremium
+      ? null
+      : Math.max(FREE_DAILY_LIMIT - nextMessageCount, 0);
+
+    let finalReply = reply;
+
+    if (
+      !isPremium &&
+      remainingFreeMessages !== null &&
+      remainingFreeMessages <= 3
+    ) {
+      finalReply = `${reply}\n\n${getLimitWarningMessage(
+        remainingFreeMessages,
+        replyLanguage
+      )}`;
+    }
+
     return res.status(200).json({
-      reply,
+      reply: finalReply,
       updatedSummary,
+      locked: false,
+      isPremium,
+      messageCount: nextMessageCount,
+      remainingFreeMessages,
     });
   } catch (error) {
     console.error("SERVER ERROR:", error);
